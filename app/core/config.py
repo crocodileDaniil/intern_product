@@ -7,8 +7,7 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+psycopg2://user:password@db:5432/cp_db"
-    #TODO: в ТЗ было ролевая модель, но пока неизвестно какая
+    database_url: str = "postgresql+psycopg2://checks_user:checks_password@db:5432/checks_db"
     admin_token: str = "admin-token"
     specialist_token: str = "specialist-token"
     user_token: str = "user-token"

@@ -8,8 +8,8 @@ from app.services.file_storage import ensure_upload_dir
 
 
 app = FastAPI(
-    title="Commercial Offers Backend",
-    description="Backend для загрузки и первичного учёта коммерческих предложений в PDF.",
+    title="Credit Document Checks API",
+    description="Backend для проверки пакетов документов по льготным кредитам.",
     version="1.0.0",
 )
 

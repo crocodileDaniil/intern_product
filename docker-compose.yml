@@ -1,27 +1,31 @@
 services:
   app:
     build: .
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql+psycopg2://cp_user:cp_password@db:5432/cp_db
-      ADMIN_TOKEN: admin-token
-      SPECIALIST_TOKEN: specialist-token
-      USER_TOKEN: user-token
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://checks_user:checks_password@db:5432/checks_db}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-admin-token}
+      SPECIALIST_TOKEN: ${SPECIALIST_TOKEN:-specialist-token}
+      USER_TOKEN: ${USER_TOKEN:-user-token}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/app/storage/uploads}
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - uploads_data:/app/storage/uploads
 
   db:
     image: postgres:16
     environment:
-      POSTGRES_DB: cp_db
-      POSTGRES_USER: cp_user
-      POSTGRES_PASSWORD: cp_password
+      POSTGRES_DB: checks_db
+      POSTGRES_USER: checks_user
+      POSTGRES_PASSWORD: checks_password
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cp_user -d cp_db"]
+      test: ["CMD-SHELL", "pg_isready -U checks_user -d checks_db"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -30,3 +34,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:
