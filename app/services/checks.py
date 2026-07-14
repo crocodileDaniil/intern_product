@@ -101,6 +101,7 @@ class ValidatedDocument:
     detected_type: DetectedDocumentType
     size_kb: int
     valid_for_processing: bool
+    issues: list[ValidationIssue]
 
 
 @dataclass(frozen=True)
@@ -136,49 +137,12 @@ def validate_package(
     detected_types: set[DetectedDocumentType] = set()
 
     for document in documents:
-        detected_type = detect_document_type(document.name)
-        extension = Path(document.name).suffix.lower()
-        size_kb = _size_kb(document.size_bytes)
-        valid_extension = extension in ALLOWED_EXTENSIONS
-        valid_size = document.size_bytes <= MAX_FILE_SIZE_BYTES
+        validated_document = validate_document(document)
+        issues.extend(validated_document.issues)
+        validated_documents.append(validated_document)
 
-        if not valid_extension:
-            issues.append(
-                ValidationIssue(
-                    level=CheckIssueLevel.warning,
-                    message=(
-                        f"Недопустимый формат файла: «{document.name}». "
-                        "Допустимы PDF, DOCX, JPG, PNG."
-                    ),
-                )
-            )
-
-        if not valid_size:
-            issues.append(
-                ValidationIssue(
-                    level=CheckIssueLevel.warning,
-                    message=f"Размер файла превышает 20 МБ: «{document.name}»",
-                )
-            )
-
-        if detected_type == DetectedDocumentType.unknown:
-            issues.append(
-                ValidationIssue(
-                    level=CheckIssueLevel.warning,
-                    message=f"Не удалось определить тип документа: «{document.name}»",
-                )
-            )
-        else:
-            detected_types.add(detected_type)
-
-        validated_documents.append(
-            ValidatedDocument(
-                name=document.name,
-                detected_type=detected_type,
-                size_kb=size_kb,
-                valid_for_processing=valid_extension and valid_size,
-            )
-        )
+        if validated_document.detected_type != DetectedDocumentType.unknown:
+            detected_types.add(validated_document.detected_type)
 
     for missing_type in sorted(
         REQUIRED_DOCUMENTS[program] - detected_types,
@@ -195,6 +159,8 @@ def validate_package(
         )
 
     final_status = calculate_final_status(issues)
+    # Если ошибок нет, сразу не говорим "approved": сначала показываем,
+    # что пакет ушел в нейромодуль-заглушку.
     status_for_response = (
         CheckStatus.rejected
         if final_status == CheckStatus.rejected
@@ -207,6 +173,49 @@ def validate_package(
         reason=_status_reason(status_for_response, issues),
         issues=issues,
         documents=validated_documents,
+    )
+
+
+def validate_document(document: IncomingDocument) -> ValidatedDocument:
+    detected_type = detect_document_type(document.name)
+    extension = Path(document.name).suffix.lower()
+    valid_extension = extension in ALLOWED_EXTENSIONS
+    valid_size = document.size_bytes <= MAX_FILE_SIZE_BYTES
+    issues: list[ValidationIssue] = []
+
+    if not valid_extension:
+        issues.append(
+            ValidationIssue(
+                level=CheckIssueLevel.warning,
+                message=(
+                    f"Недопустимый формат файла: «{document.name}». "
+                    "Допустимы PDF, DOCX, JPG, PNG."
+                ),
+            )
+        )
+
+    if not valid_size:
+        issues.append(
+            ValidationIssue(
+                level=CheckIssueLevel.warning,
+                message=f"Размер файла превышает 20 МБ: «{document.name}»",
+            )
+        )
+
+    if detected_type == DetectedDocumentType.unknown:
+        issues.append(
+            ValidationIssue(
+                level=CheckIssueLevel.warning,
+                message=f"Не удалось определить тип документа: «{document.name}»",
+            )
+        )
+
+    return ValidatedDocument(
+        name=document.name,
+        detected_type=detected_type,
+        size_kb=_size_kb(document.size_bytes),
+        valid_for_processing=valid_extension and valid_size,
+        issues=issues,
     )
 
 
@@ -238,6 +247,8 @@ class CheckService:
                 }
             )
 
+        # Бэкенд проверяет только то, что может проверить сам:
+        # формат, размер, имя файла и комплектность пакета.
         validation = validate_package(
             program=program,
             documents=[
@@ -254,7 +265,7 @@ class CheckService:
         extracted = (
             {
                 "message": (
-                    "Файлы прошли базовую проверку и переданы в нейромодуль. "
+                    "Базовая проверка файлов выполнена, пакет передан в нейромодуль. "
                     "Извлечение реквизитов заменено заглушкой."
                 ),
                 "task_id": str(task_id),
@@ -284,7 +295,10 @@ class CheckService:
             self.db.flush()
 
             version_offsets: dict[tuple[str, DetectedDocumentType], int] = {}
-            for uploaded_file, validated_document in zip(uploaded_files, validation.documents):
+            for uploaded_file, validated_document in zip(
+                uploaded_files,
+                validation.documents,
+            ):
                 filename = uploaded_file["filename"]
                 content = uploaded_file["content"]
                 file_path = save_upload(content, filename)
@@ -358,7 +372,10 @@ class CheckService:
     def get_check(self, check_id: UUID) -> CheckResponse:
         check = self.db.get(DocumentCheck, check_id)
         if check is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Проверка не найдена")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Проверка не найдена",
+            )
         return self._to_response(check)
 
     def _next_document_version(
@@ -390,9 +407,6 @@ class CheckService:
                     name=document.original_filename,
                     detected_type=document.detected_type,
                     size_kb=document.size_kb,
-                    version=document.version,
-                    valid_for_processing=document.valid_for_processing,
-                    processing_message=document.processing_message,
                 )
                 for document in check.documents
             ],

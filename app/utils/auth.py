@@ -3,7 +3,7 @@ from enum import StrEnum
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.utils.config import settings
+from app.core.config import settings
 
 
 class Role(StrEnum):
@@ -27,7 +27,7 @@ def get_current_role(
     if role is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication token",
+            detail="Неверный токен авторизации",
         )
     return role
 
@@ -37,7 +37,7 @@ def require_roles(*allowed_roles: Role):
         if role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions",
+                detail="Недостаточно прав",
             )
         return role
 

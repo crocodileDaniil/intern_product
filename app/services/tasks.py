@@ -1,8 +1,8 @@
-"""Background processing placeholders.
+"""Фоновые задачи, которые пока заменяют реальный нейромодуль.
 
-The real neural module is outside of this backend test task. This function
-keeps the async boundary explicit: API creates a task id and a background job
-marks the package as processed by a stub.
+Настоящее извлечение реквизитов выходит за рамки тестового задания. Здесь
+мы явно показываем точку интеграции: API создает task_id, а фоновая задача
+помечает пакет как обработанный заглушкой.
 """
 from uuid import UUID
 

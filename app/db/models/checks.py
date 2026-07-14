@@ -1,4 +1,4 @@
-"""SQLAlchemy models for credit document package checks."""
+"""Модели SQLAlchemy для проверок пакетов кредитных документов."""
 import enum
 import uuid
 

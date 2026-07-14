@@ -1,9 +1,4 @@
-"""create checks tables
-
-Revision ID: 20260714_0001
-Revises:
-Create Date: 2026-07-14
-"""
+"""Создание таблиц проверок документов."""
 from collections.abc import Sequence
 
 import sqlalchemy as sa

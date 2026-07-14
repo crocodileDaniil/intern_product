@@ -20,9 +20,6 @@ class CheckDocumentResponse(BaseModel):
     name: str
     detected_type: DetectedDocumentType
     size_kb: int
-    version: int
-    valid_for_processing: bool
-    processing_message: str
 
 
 class CheckResponse(BaseModel):
